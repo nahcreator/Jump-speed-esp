@@ -1,0 +1,185 @@
+
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Settings
+local jumpPower = 100
+local walkSpeed = 50
+
+-- Interface
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = LocalPlayer.PlayerGui
+ScreenGui.Name = "MobileHub"
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 200, 0, 300)
+mainFrame.Position = UDim2.new(0, 10, 0, 100)
+mainFrame.BackgroundTransparency = 0.2
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.Parent = ScreenGui
+
+-- Function to create buttons
+local function createButton(text, posY)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 40)
+    btn.Position = UDim2.new(0, 10, 0, posY)
+    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 18
+    btn.Parent = mainFrame
+    return btn
+end
+
+local jumpBtn = createButton("Jump Power", 10)
+local speedBtn = createButton("Speed", 60)
+local flyBtn = createButton("Fly", 110)
+local highlightBtn = createButton("Highlight Players", 160)
+
+-- State of functions
+local jumpOn = false
+local speedOn = false
+local flyOn = false
+local highlightOn = false
+
+-- Jump Function
+jumpBtn.MouseButton1Click:Connect(function()
+    jumpOn = not jumpOn
+    if jumpOn then
+        jumpBtn.Text = "Jump Power [ON]"
+        LocalPlayer.Character.Humanoid.UseJumpPower = true
+        LocalPlayer.Character.Humanoid.JumpPower = jumpPower
+    else
+        jumpBtn.Text = "Jump Power"
+        LocalPlayer.Character.Humanoid.JumpPower = 50
+    end
+end)
+
+-- Speed Function
+speedBtn.MouseButton1Click:Connect(function()
+    speedOn = not speedOn
+    if speedOn then
+        speedBtn.Text = "Speed [ON]"
+        LocalPlayer.Character.Humanoid.WalkSpeed = walkSpeed
+    else
+        speedBtn.Text = "Speed"
+        LocalPlayer.Character.Humanoid.WalkSpeed = 16
+    end
+end)
+
+-- Fly Function
+local flyConn
+flyBtn.MouseButton1Click:Connect(function()
+    flyOn = not flyOn
+    if flyOn then
+        flyBtn.Text = "Fly [ON]"
+        local char = LocalPlayer.Character
+        local humanoid = char and char:FindFirstChildWhichIsA("Humanoid")
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if humanoid and root then
+            humanoid.PlatformStand = true
+            local flySpeed = 3
+            flyConn = RunService.RenderStepped:Connect(function()
+                if UIS.TouchEnabled then
+                    local moveVec = Vector3.new()
+                    if UIS:IsKeyDown(Enum.KeyCode.Thumbstick1) then
+                        moveVec = Vector3.new(0,flySpeed,0)
+                    end
+                    root.Velocity = Vector3.new(UIS:GetDeviceAcceleration().X*flySpeed,moveVec.Y,UIS:GetDeviceAcceleration().Y*flySpeed)
+                end
+            end)
+        end
+    else
+        flyBtn.Text = "Fly"
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChildWhichIsA("Humanoid") then
+            char:FindFirstChildWhichIsA("Humanoid").PlatformStand = false
+        end
+        if flyConn then flyConn:Disconnect() end
+    end
+end)
+
+-- Highlight Players
+local highlights = {}
+local nameTags = {}
+
+local function highlightPlayers(state)
+    for i,plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            if state then
+                -- Highlight
+                if not highlights[plr] then
+                    local hl = Instance.new("Highlight")
+                    hl.Adornee = plr.Character
+                    hl.FillColor = Color3.new(1,0,0)
+                    hl.OutlineColor = Color3.new(1,0,0)
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    hl.Parent = plr.Character
+                    highlights[plr] = hl
+                end
+                -- NameTag
+                if not nameTags[plr] then
+                    local billboard = Instance.new("BillboardGui")
+                    billboard.Adornee = plr.Character:FindFirstChild("Head") or plr.Character:FindFirstChild("HumanoidRootPart")
+                    billboard.Size = UDim2.new(0, 100, 0, 30)
+                    billboard.StudsOffset = Vector3.new(0, 3, 0)
+                    billboard.AlwaysOnTop = true
+                    local txt = Instance.new("TextLabel")
+                    txt.Size = UDim2.new(1,0,1,0)
+                    txt.BackgroundTransparency = 1
+                    txt.Text = plr.Name
+                    txt.TextColor3 = Color3.new(1,0,0)
+                    txt.TextStrokeTransparency = 0
+                    txt.Font = Enum.Font.SourceSansBold
+                    txt.TextSize = 18
+                    txt.Parent = billboard
+                    billboard.Parent = plr.Character
+                    nameTags[plr] = billboard
+                end
+            else
+                -- Remove highlight
+                if highlights[plr] then
+                    highlights[plr]:Destroy()
+                    highlights[plr] = nil
+                end
+                -- Remove nametag
+                if nameTags[plr] then
+                    nameTags[plr]:Destroy()
+                    nameTags[plr] = nil
+                end
+            end
+        end
+    end
+end
+
+highlightBtn.MouseButton1Click:Connect(function()
+    highlightOn = not highlightOn
+    if highlightOn then
+        highlightBtn.Text = "Highlight Players [ON]"
+        highlightPlayers(true)
+    else
+        highlightBtn.Text = "Highlight Players"
+        highlightPlayers(false)
+    end
+end)
+
+-- Update highlights for new players
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function()
+        if highlightOn then
+            wait(1)
+            highlightPlayers(true)
+        end
+    end)
+end)
+
+-- Only enable for mobile devices
+if not UIS.TouchEnabled then
+    ScreenGui.Enabled = false
+end
+```
+All labels, comments, and UI texts are now in English.
